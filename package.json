@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "@fastify/cors": "^11.3.0",
+    "bcrypt": "^6.0.0",
+    "dotenv": "^17.4.2",
+    "fastify": "^5.12.1",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.23.0"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --trace-warnings --watch server.js"
+  }
+}
