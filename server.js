@@ -9,7 +9,7 @@ import 'dotenv/config'
 const server = fastify()
 
 await server.register(cors, {
-    origin: "http://localhost:5173",
+    origin: process.env.CORS_ORIGIN || "http://localhost:5173",
     methods: ["GET", "POST", "PUT", "DELETE"]
 })
 
@@ -189,8 +189,7 @@ server.get('/validate-token', async(req, res) => {
 })
 
 
-
-
 server.listen({
-    port: 3333
+    port: process.env.PORT || 3333,
+    host: '0.0.0.0'
 })
