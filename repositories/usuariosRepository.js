@@ -1,6 +1,6 @@
 import client from "../db.js";
 
-export async function buscarUsuario(email) {
+export async function buscarUsuarioEmail(email) {
     const response = await client.query("SELECT * FROM usuarios WHERE email = $1",
         [email]
     )

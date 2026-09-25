@@ -2,11 +2,11 @@ import client from "../db.js"
 
 
 export async function listarPostagens() {
-    const response = await client.query('SELECT posts.id, posts.titulo, posts.descricao, posts.data_criacao, posts.usuario_id, usuarios.nome FROM posts JOIN usuarios ON posts.usuario_id = usuarios.id')
+    const response = await client.query('SELECT posts.id, posts.titulo, posts.descricao, posts.data_criacao, posts.usuario_id, usuarios.nome, usuarios.foto_url FROM posts JOIN usuarios ON posts.usuario_id = usuarios.id')
     return response.rows
 }
 
-export async function listarMinhasPostagens(id) {
+export async function listarPostagensUsuario(id) {
     const response = await client.query('SELECT * FROM posts WHERE usuario_id = $1',
         [id]
     )
