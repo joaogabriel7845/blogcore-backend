@@ -1,6 +1,6 @@
 # BlogCore — Back-end
 
-API REST do BlogCore, uma aplicação de blog/rede social em estilo Instagram, com cadastro de usuários, autenticação, posts e perfis.
+API REST do BlogCore, uma rede social voltada para educação, em estilo Instagram, onde os usuários compartilham o que estão aprendendo, o que gostariam de aprender ou interesses educacionais em geral.
 
 ## Tecnologias
 
@@ -15,7 +15,7 @@ API REST do BlogCore, uma aplicação de blog/rede social em estilo Instagram, c
 
 - Cadastro e login de usuários
 - Autenticação via JWT
-- Criação de posts
+- Criação de posts sobre aprendizados, objetivos de estudo ou interesses educacionais
 - Upload e edição de foto de perfil
 - Edição de bio
 - Visualização de perfil de outros usuários
