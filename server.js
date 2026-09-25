@@ -5,8 +5,10 @@ import multipart from '@fastify/multipart'
 import bcrypt from "bcrypt"
 import jwt from 'jsonwebtoken'
 import 'dotenv/config'
-import { atualizarBio, atualizarFoto, buscarUsuario, buscarUsuarioId, criarUsuario } from "./repositories/usuariosRepository.js";
-import { atualizarPostagem, buscarPostagem, criarPostagens, deletarPostagem, listarMinhasPostagens, listarPostagens } from "./repositories/postsRepository.js";
+import { atualizarBio, atualizarFoto, buscarUsuarioEmail, buscarUsuarioId, criarUsuario } from "./repositories/usuariosRepository.js";
+import { atualizarPostagem, buscarPostagem, criarPostagens, deletarPostagem, listarPostagens, listarPostagensUsuario } from "./repositories/postsRepository.js";
+import { autenticar } from "./middlewares/auth.js";
+
 
 
 const server = fastify()
@@ -31,16 +33,11 @@ server.get('/posts', async (req, res) => {
     return res.send(postagens)
 })
 
-server.post('/posts', async (req, res) => {
+server.post('/posts', { preHandler: autenticar }, async (req, res) => {
 
-    const authorization = req.headers.authorization
-    const token = authorization.split(" ")[1]
-    const secretKey = process.env.JWT_SECRET
-    const payload = jwt.verify(token, secretKey)
-    
     const {titulo, descricao} = req.body
     
-    const postagem = await criarPostagens(titulo, descricao, payload.id)
+    const postagem = await criarPostagens(titulo, descricao, req.usuario.id)
 
     res.status(201).send(postagem)
     
@@ -118,78 +115,43 @@ server.delete('/posts/:id', async(req, res) => {
 
 // Usuário
 
-server.get('/me/:id', async(req, res) => {
+server.get('/perfil/:id', { preHandler: autenticar } ,async(req, res) => {
 
     const id = req.params.id
 
-    const authorization = req.headers.authorization
-    if(!authorization) {
-        return res.status(401).send({ message: 'Token não fornecido' })
-    }
-    const token = authorization.split(" ")[1]
-    const secretKey = process.env.JWT_SECRET
-
-    let payload  
-
-    try {
-        payload = jwt.verify(token, secretKey)
-    } catch (error) {
-        return res.status(401).send({ message: 'Token inválido' })
-    }
-
-    if (Number(id) !== payload.id) {
-        return res.status(403).send({message: "Sem permissão"})
-    }
-    
-    const usuario = await buscarUsuarioId(payload.id)
-    const myPosts = await listarMinhasPostagens(payload.id)
+    const usuario = await buscarUsuarioId(id)
+    const postsUser = await listarPostagensUsuario(id)
 
     if(!usuario) {
         return res.status(404).send({ message: 'Usuário não encontrado' })
     }
-    if(!myPosts) {
+    if(!postsUser) {
         return res.status(404).send({ message: 'Voce ainda não possui posts' })
     }
     
-    
     return res.send({
         usuario, 
-        myPosts
+        postsUser
     })
     
 })
 
-server.put('/me/:id', async(req, res) => {
+server.put('/perfil/:id', { preHandler: autenticar }, async(req, res) => {
     const id = req.params.id
     const { bio } = req.body
 
-    const authorization = req.headers.authorization
-    if(!authorization) {
-        return res.status(401).send({ message: 'Token não fornecido' })
-    }
-    const token = authorization.split(" ")[1]
-    const secretKey = process.env.JWT_SECRET
-
-    let payload  
-
-    try {
-        payload = jwt.verify(token, secretKey)
-    } catch (error) {
-        return res.status(401).send({ message: 'Token inválido' })
-    }
-
-    if (Number(id) !== payload.id) {
+    if (Number(id) !== req.usuario.id) {
         return res.status(403).send({message: "Sem permissão"})
     }
 
-    await atualizarBio(bio, payload.id)
+    await atualizarBio(bio, id)
 
     return res.status(204).send()
 
 
 })
 
-server.put('/me/:id/foto', async(req, res) => {
+server.put('/perfil/:id/foto', async(req, res) => {
 
     const id = req.params.id
     const foto = await req.file()
@@ -221,9 +183,7 @@ server.put('/me/:id/foto', async(req, res) => {
 
     res.status(200).send({ foto_url: resultado.secure_url })
 
-
 })
-
 
 // Registro
 
@@ -232,7 +192,7 @@ server.post('/register', async(req, res) => {
 
     const senhaHash = await bcrypt.hash(senha, 10)
 
-    const usuario = await buscarUsuario(email)
+    const usuario = await buscarUsuarioEmail(email)
     
     if(usuario) {
         res.status(409).send({ message: "Email já cadastrado" })
@@ -250,7 +210,7 @@ server.post('/login', async(req, res) => {
 
     const {email, senha} = req.body
     
-    const usuario = await buscarUsuario(email)
+    const usuario = await buscarUsuarioEmail(email)
     
     if (!usuario) {
         res.status(401).send({ message: "E-mail ou senha inválidos" })
@@ -268,10 +228,8 @@ server.post('/login', async(req, res) => {
         
         res.status(200).send({ token })
 
-        console.log("deu certo zé!")
     } else {
         res.status(401).send({ message: "E-mail ou senha inválidos" })
-        console.log("deu ERRADO zé!")
     }
 
 })
@@ -283,7 +241,6 @@ server.get('/validate-token', async(req, res) => {
     const authorization = req.headers.authorization
     const secretKey = process.env.JWT_SECRET
     const token = authorization.split(" ")[1]
-
 
     try {
         jwt.verify(token, secretKey)
