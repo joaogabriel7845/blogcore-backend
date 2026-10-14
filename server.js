@@ -5,7 +5,7 @@ import multipart from '@fastify/multipart'
 import bcrypt from "bcrypt"
 import jwt from 'jsonwebtoken'
 import 'dotenv/config'
-import { atualizarBio, atualizarFoto, buscarUsuarioEmail, buscarUsuarioId, criarUsuario } from "./repositories/usuariosRepository.js";
+import { atualizarBio, atualizarFoto, atualizarNome, buscarUsuarioEmail, buscarUsuarioId, criarUsuario } from "./repositories/usuariosRepository.js";
 import { atualizarPostagem, buscarPostagem, criarPostagens, deletarPostagem, listarPostagens, listarPostagensUsuario } from "./repositories/postsRepository.js";
 import { autenticar } from "./middlewares/auth.js";
 
@@ -43,26 +43,10 @@ server.post('/posts', { preHandler: autenticar }, async (req, res) => {
     
 })
 
-server.put('/posts/:id', async(req, res) => {
+server.put('/posts/:id', { preHandler: autenticar },async(req, res) => {
 
     const {id} = req.params
     const {titulo, descricao} = req.body
-
-    const authorization = req.headers.authorization
-    if(!authorization) {
-        return res.status(401).send({ message: 'Token não fornecido' })
-    }
-    const token = authorization.split(" ")[1]
-    const secretKey = process.env.JWT_SECRET
-
-    let payload
-    
-    try {
-        payload = jwt.verify(token, secretKey)
-        
-    } catch (error) {
-        return res.status(401).send({ message: 'Token inválido' })
-    }
     
     const post = await buscarPostagem(id)
     
@@ -70,7 +54,7 @@ server.put('/posts/:id', async(req, res) => {
         return res.status(404).send({ message: 'Post não encontrado' })
     }
     
-    if(post.usuario_id !== payload.id) {
+    if(post.usuario_id !== req.usuario.id) {
         return res.status(403).send({ message: 'Sem permissão' })
     }
     
@@ -79,24 +63,9 @@ server.put('/posts/:id', async(req, res) => {
     
 })
 
-server.delete('/posts/:id', async(req, res) => {
+server.delete('/posts/:id', { preHandler: autenticar }, async(req, res) => {
     
     const {id} = req.params    
-    
-    const authorization = req.headers.authorization
-    if(!authorization) {
-        return res.status(401).send({ message: 'Token não fornecido' })
-    }
-    const token = authorization.split(" ")[1]
-    const secretKey = process.env.JWT_SECRET
-    
-    let payload
-
-    try {
-        payload = jwt.verify(token, secretKey)
-    } catch (error) {
-        return res.status(401).send({ message: 'Token inválido' })
-    }
     
     const post = await buscarPostagem(id)
     
@@ -104,7 +73,7 @@ server.delete('/posts/:id', async(req, res) => {
         return res.status(404).send({ message: 'Post não encontrado' })
     }
     
-    if(post.usuario_id !== payload.id) {
+    if(post.usuario_id !== req.usuario.id) {
         return res.status(403).send({ message: 'Sem permissão' })
     }
     
@@ -136,7 +105,7 @@ server.get('/perfil/:id', { preHandler: autenticar } ,async(req, res) => {
     
 })
 
-server.put('/perfil/:id', { preHandler: autenticar }, async(req, res) => {
+server.put('/perfil/:id/bio', { preHandler: autenticar }, async(req, res) => {
     const id = req.params.id
     const { bio } = req.body
 
@@ -151,37 +120,43 @@ server.put('/perfil/:id', { preHandler: autenticar }, async(req, res) => {
 
 })
 
-server.put('/perfil/:id/foto', async(req, res) => {
+server.put('/perfil/:id/foto', { preHandler: autenticar }, async(req, res) => {
 
     const id = req.params.id
     const foto = await req.file()
     const buffer = await foto.toBuffer()
 
-    const authorization = req.headers.authorization
-    if(!authorization) {
-        return res.status(401).send({ message: 'Token não fornecido' })
+    if (Number(id) !== req.usuario.id) {
+        return res.status(403).send({message: "Sem permissão"})
     }
-    const token = authorization.split(" ")[1]
-    const secretKey = process.env.JWT_SECRET
+    
+    const dataUri = `data:${foto.mimetype};base64,${buffer.toString('base64')}`
+    const resultado = await cloudinary.v2.uploader.upload(dataUri)
+    
+    await atualizarFoto(resultado.secure_url, id)
+    
+    res.status(200).send({ foto_url: resultado.secure_url })
+    
+})
 
-    let payload  
-
-    try {
-        payload = jwt.verify(token, secretKey)
-    } catch (error) {
-        return res.status(401).send({ message: 'Token inválido' })
-    }
-
-    if (Number(id) !== payload.id) {
+server.put('/perfil/:id/nome', {preHandler: autenticar}, async(req, res) => {
+    const id = req.params.id
+    const { nome } = req.body
+    
+    if (Number(id) !== req.usuario.id) {
         return res.status(403).send({message: "Sem permissão"})
     }
 
-    const dataUri = `data:${foto.mimetype};base64,${buffer.toString('base64')}`
-    const resultado = await cloudinary.v2.uploader.upload(dataUri)
-
-    await atualizarFoto(resultado.secure_url, id)
-
-    res.status(200).send({ foto_url: resultado.secure_url })
+    if (!nome || nome.trim().length < 2) {
+        return res.status(400).send({ message: "Nome inválido" })
+    }
+    
+    try {
+        await atualizarNome(nome, id)
+        return res.status(204).send()
+    } catch (error) {
+        return res.status(500).send({ message: "Erro ao atualizar nome" })
+    }
 
 })
 
@@ -252,7 +227,17 @@ server.get('/validate-token', async(req, res) => {
 })
 
 
-server.listen({
+if (!process.env.VERCEL) {
+  server.listen({
     port: process.env.PORT || 3333,
     host: '0.0.0.0'
-})
+  }, (err, address) => {
+    if (err) {
+      console.error(err)
+      process.exit(1)
+    }
+    console.log(`Servidor rodando em ${address}`)
+  })
+}
+
+export default server;

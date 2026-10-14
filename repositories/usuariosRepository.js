@@ -21,6 +21,12 @@ export async function criarUsuario(nome, email, senhaHash) {
     )
 }
 
+export async function atualizarNome(nome, id) {
+    await client.query("UPDATE usuarios SET nome = $1 WHERE id = $2", 
+        [nome, id]
+    )
+}
+
 export async function atualizarBio(bio, id) {
     await client.query('UPDATE usuarios SET bio = $1 WHERE id = $2',
         [bio, id]
